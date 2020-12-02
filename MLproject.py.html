@@ -1,0 +1,503 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# # Food insecurity effect on asthma patients
+
+# In[1]:
+
+
+import numpy as np
+import pandas as pd
+from sklearn import preprocessing
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+import seaborn as sns
+import matplotlib.pyplot as plt
+sns.set(style="white")
+sns.set(style="whitegrid", color_codes=True)
+from keras.models import Sequential
+from keras.layers import Dense ,Dropout,BatchNormalization
+from keras.layers import Dense
+from keras.wrappers.scikit_learn import KerasRegressor
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import KFold
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+import scipy.stats as stats 
+from scipy.stats import gamma
+from sklearn.metrics import mean_squared_error
+import math
+from keras.layers import Dropout
+from keras import regularizers
+
+
+# In[2]:
+
+
+df = pd.read_csv ('Asthma.csv', header=0 )
+df = df.reindex(columns=['AGE42X','SEX','obesity','MARRY42X','REGION42','INSCOV16','POVCAT16','high_bp','arthritis','diabetes','FSOUT42', 'FSLAST42','FSAFRD42','FSSKIP42','FSSKDY42','FSLESS42','FSHGRY42','FSWTLS42','FSNEAT42','FSNEDY42','MCS42','PCS42'])
+df = df.dropna()
+print(df.shape)
+print(list(df.columns))
+# df = df.reindex(columns=['AGE42X','ageg3','ageg4','ageg5','ageg6', 'ageg7','SEX','obesity','MARRY42X','REGION42','unins','ins_pub','anyins','poorinc','nearpoorinc','lowinc','highinc','hsged' ,'otherdeg' ,'bsdeg','msphd','high_bp','arthritis','diabetes','q1','q2','q3','q4','q5','q6','q7','q8','q9','q10','MCS42','PCS42'])
+
+
+# In[51]:
+
+
+df.head()
+
+
+# In[52]:
+
+
+df
+
+
+# In[5]:
+
+
+# df_filtered = df.query('MCS42<50')
+# df_filtered
+
+
+# In[24]:
+
+
+corr = df.corr()
+fig = plt.figure()
+ax = fig.add_subplot(111)
+cax = ax.matshow(corr,cmap='coolwarm', vmin=-1, vmax=1)
+fig.colorbar(cax)
+ticks = np.arange(0,len(df.columns),1)
+ax.set_xticks(ticks)
+plt.xticks(rotation=90)
+ax.set_yticks(ticks)
+ax.set_xticklabels(df.columns)
+ax.set_yticklabels(df.columns)
+plt.show()
+
+
+# In[28]:
+
+
+C_mat = df.corr()
+fig = plt.figure(figsize = (15,15))
+sns.heatmap(C_mat,cmap='coolwarm', vmax = .8, square = True)
+plt.show()
+
+
+# In[20]:
+
+
+import seaborn as sns
+corr = df.corr()
+sns.heatmap(corr, 
+            xticklabels=corr.columns.values,
+            yticklabels=corr.columns.values)
+
+
+# In[136]:
+
+
+for column_1st in df:
+    for coloum_2nd in df:
+        jet=plt.get_cmap('jet')
+        plt.figure(figsize=(5,5))
+        plt.scatter(df[column_1st], df[coloum_2nd], s=30, c=df['MCS42'], vmin=0, vmax=1, cmap=jet)
+        plt.xlabel(column_1st,fontsize=40)
+        plt.ylabel(coloum_2nd,fontsize=40)
+        plt.colorbar()
+        plt.show()
+
+
+# In[3]:
+
+
+
+X=np.asarray(df.drop(["MCS42","PCS42"],axis=1))
+Y=np.asarray(df["MCS42"])
+
+from scipy.stats import norm
+sns.distplot(Y,fit=norm);
+fig = plt.figure()
+res = stats.probplot(Y, plot=plt)
+
+
+# In[54]:
+
+
+Y=np.asarray(df["MCS42"])
+Y = np.log(Y)
+sns.distplot(Y,fit=norm);
+fig = plt.figure()
+res = stats.probplot(Y, plot=plt)
+
+
+# In[11]:
+
+
+Y=np.asarray(df["MCS42"])
+Y = np.sqrt(Y)
+sns.distplot(Y,fit=norm);
+fig = plt.figure()
+res = stats.probplot(Y, plot=plt)
+
+
+# In[12]:
+
+
+a, loc, scale = stats.gamma.fit(Y)
+print(a, loc, scale)
+Y=np.asarray(df["MCS42"])
+Y = stats.gamma.rvs(a, loc, scale , size=1803)
+sns.distplot(Y,fit=gamma);
+fig = plt.figure()
+res = stats.probplot(Y, plot=plt)
+
+
+# In[4]:
+
+
+import statsmodels.api as sm
+gamma_model = sm.GLM(Y, X, family=sm.families.Gamma())
+gamma_results = gamma_model.fit()
+print(gamma_results.summary())
+predicted=gamma_results.predict(X)
+
+
+# In[5]:
+
+
+from sklearn.metrics import mean_squared_error
+mse = mean_squared_error (Y, predicted)
+rmse = math.sqrt(mse)
+print (rmse)
+
+
+# In[6]:
+
+
+from statsmodels.formula.api import ols
+import matplotlib.pyplot as plt
+ols_model = ols("Y ~ X", df).fit()
+print(ols_model.summary())
+
+
+# In[4]:
+
+
+from sklearn.model_selection import train_test_split
+X_train, X_val_and_test, Y_train, Y_val_and_test = train_test_split(X, Y, test_size=0.3)
+X_val, X_test, Y_val, Y_test = train_test_split(X_val_and_test, Y_val_and_test, test_size=0.5)
+print(X_train.shape, X_val.shape, X_test.shape, Y_train.shape, Y_val.shape, Y_test.shape)
+
+
+# In[5]:
+
+
+from sklearn.metrics import mean_squared_error
+from sklearn.linear_model import GammaRegressor
+glm_sev = GammaRegressor(alpha=10., max_iter=10000)
+
+glm_sev.fit(
+    X,
+    Y)
+predicted=glm_sev.predict(X)
+mse = mean_squared_error (Y, predicted)
+rmse = math.sqrt(mse)
+print (rmse)
+
+
+# In[6]:
+
+
+from sklearn import datasets, linear_model
+from sklearn.metrics import mean_squared_error, r2_score
+
+regr = linear_model.LinearRegression()
+
+# Train the model using the training sets
+regr.fit(X_train, Y_train)
+
+# Make predictions using the testing set
+Y_pred = regr.predict(X_test)
+
+# The coefficients
+print('Coefficients: \n', regr.coef_)
+# The mean squared error
+print('Mean squared error: %.2f'
+      % mean_squared_error(Y_test, Y_pred))
+# The coefficient of determination: 1 is perfect prediction
+print('Coefficient of determination: %.2f'
+      % r2_score(Y_test, Y_pred))
+
+
+# In[7]:
+
+
+from keras.models import Sequential
+from keras.layers import Dense
+
+
+# In[8]:
+
+
+model = Sequential([    
+    Dense(40,  input_shape=(20,), activation = 'relu' ),    
+    Dense(20 , activation = 'relu'),
+    Dense(10, activation = 'relu'),
+    Dense(1),])
+
+# seed = 7
+# np.random.seed(seed)
+
+# # Model
+# model = Sequential()
+# model.add(Dense(30, input_dim=13, kernel_initializer='normal', activation='relu'))
+# model.add(Dense(15, kernel_initializer='normal', activation='linear'))
+# model.add(Dense(1, kernel_initializer='normal'))
+
+
+# In[9]:
+
+
+model.compile(optimizer='adam', 
+              loss='mean_squared_error'
+              )
+
+model.summary()
+
+# model.compile(loss='mean_squared_error', optimizer= 'Adam')
+
+
+# In[10]:
+
+
+history = model.fit(X_train, Y_train,          
+          batch_size=1 , epochs=100,          
+          validation_data=(X_val, Y_val))
+
+
+# In[11]:
+
+
+model.evaluate(X_test, Y_test)
+
+
+# In[12]:
+
+
+model_json = model.to_json()
+with open("model.json", "w") as json_file:
+    json_file.write(model_json)
+# serialize weights to HDF5
+model.save_weights("model.h5")
+print("Saved model to disk")
+
+
+# In[13]:
+
+
+from ann_visualizer.visualize import ann_viz;
+from keras.models import model_from_json
+
+
+# fix random seed for reproducibility
+np.random.seed(7)
+# load json and create model
+json_file = open('model.json', 'r')
+loaded_model_json = json_file.read()
+json_file.close()
+model = model_from_json(loaded_model_json)
+
+# load weights into new model
+model.load_weights("model.h5")
+
+ann_viz(model, title="Artificial Neural network - Model Visualization")
+
+
+# In[15]:
+
+
+import VisualizeNN as VisNN
+network=VisNN.DrawNN([3,4,1])
+network.draw()
+
+
+# In[66]:
+
+
+# Plot training & validation loss values
+plt.plot(history.history['loss'])
+
+plt.title('Model loss')
+plt.ylabel('Loss')
+plt.xlabel('Epoch')
+plt.legend(['Train', 'Test'], loc='upper left')
+plt.show()
+
+
+# In[67]:
+
+
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('Model loss')
+plt.ylabel('Loss')
+plt.xlabel('Epoch')
+plt.legend(['Train', 'Val'], loc='upper right')
+plt.show()
+
+
+# In[173]:
+
+
+model_2 = Sequential([    
+    Dense(40, activation = 'relu',  input_shape=(20,)),    Dropout(0.3),    
+    Dense(20, activation='relu'),     
+    Dense(10, activation='relu'),     
+    Dense(1),])
+
+
+# In[69]:
+
+
+model_2.compile(optimizer='adam', 
+              loss='mean_squared_error'
+              )
+
+model_2.summary()
+
+
+# In[70]:
+
+
+history_2 = model_2.fit(X_train, Y_train,          
+          batch_size=1 , epochs=100,          
+          validation_data=(X_val, Y_val))
+
+
+# In[ ]:
+
+
+model_2.evaluate(X_test, Y_test)
+
+
+# In[72]:
+
+
+
+
+
+# In[73]:
+
+
+# Plot training & validation loss values
+plt.plot(history_2.history['loss'])
+
+plt.title('Model loss')
+plt.ylabel('Loss')
+plt.xlabel('Epoch')
+plt.legend(['Train', 'Test'], loc='upper left')
+plt.show()
+
+
+# In[74]:
+
+
+plt.plot(history_2.history['loss'])
+plt.plot(history_2.history['val_loss'])
+plt.title('Model loss')
+plt.ylabel('Loss')
+plt.xlabel('Epoch')
+plt.legend(['Train', 'Val'], loc='upper right')
+plt.show()
+
+
+# # Classification
+
+# In[75]:
+
+
+df_classifier = df.copy()
+
+
+# In[76]:
+
+
+df_classifier.head()
+
+
+# In[215]:
+
+
+from sklearn.metrics import precision_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import f1_score
+from sklearn.metrics import roc_curve, auc
+
+f1 = list(range(100))
+for threshold in range (0,100):
+    Y_train_classified = (Y_train > threshold)*1
+    predictedY_train = model.predict(X_train)
+    predictedY_train_classified = (predictedY_train > threshold)*1
+    predictedResult=[predictedY_train_classified[i, 0] for i in range (1262) ]
+    average_precision = precision_score(Y_train_classified, predictedResult, average = 'macro')
+    average_recall = recall_score(Y_train_classified, predictedResult, average='macro')
+    average_f1 = f1_score(Y_train_classified, predictedResult, average='macro')
+    f1[threshold]=average_f1
+
+plt.plot(range(100), f1)
+plt.title('F1 Score')
+plt.ylabel('F1')
+plt.xlabel('Threshold')
+plt.show()
+
+
+# In[210]:
+
+
+
+
+
+# In[219]:
+
+
+# from sklearn.metrics import precision_recall_curve
+# from sklearn.metrics import plot_precision_recall_curve
+
+# disp = plot_precision_recall_curve(classifier, X_test, y_test)
+# disp.ax_.set_title('2-class Precision-Recall curve: '
+#                    'AP={0:0.2f}'.format(average_precision))
+
+
+# In[ ]:
+
+
+from sklearn.model_selection import KFold
+kf = KFold(n_splits=5, shuffle=False).split(range(25))
+
+print('{} {:^61} {}'.format('Iteration', 'Training set observations', 'Testing set observations'))
+for iteration, data in enumerate(kf, start=1):
+    print('{:^9} {} {:^25}'.format(iteration, data[0], str(data[1])))
+
+
+# In[ ]:
+
+
+from sklearn.model_selection import cross_val_score
+
+
+# In[1]:
+
+
+from IPython.display import display
+Image("DNN.png")
+
+
+# In[ ]:
+
+
+
+
